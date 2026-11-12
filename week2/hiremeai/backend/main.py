@@ -174,3 +174,7 @@ def chat(request: ChatRequest):
     resume = parse_resume(resume_text)
     answer = ask_candidate(request.question, resume)
     return {"answer": answer}
+
+
+
+
