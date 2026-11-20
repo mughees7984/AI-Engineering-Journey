@@ -1,9 +1,14 @@
 .env
 .env.*
 !.env.example
+
 .venv/
 venv/
 __pycache__/
 *.pyc
+
 node_modules/
 .next/
+
+my_resume.pdf
+parsed_resume.json
