@@ -1,293 +1,5 @@
-# import json
-# import os
-# from pathlib import Path
-# from fastapi.middleware.cors import CORSMiddleware
-# from fastapi.responses import StreamingResponse
-# from dotenv import load_dotenv
-# from fastapi import FastAPI
-# from groq import Groq
-# from pydantic import BaseModel
-# from pypdf import PdfReader
 
-# load_dotenv()
-
-# client = Groq(
-#     api_key=os.getenv("GROQ_API_KEY")
-# )
-
-# model = "openai/gpt-oss-120b"
-
-# app = FastAPI()
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=[
-#         "http://localhost:3000",
-#         "http://127.0.0.1:3000",
-#     ],
-#     allow_credentials=True,
-#     allow_methods=["GET", "POST"],
-#     allow_headers=["Content-Type"],
-# )
-
-# #parse resume
-# class Experience(BaseModel):
-#     company: str | None = None
-#     role: str | None = None
-#     duration: str | None = None
-#     description: str | None = None
-#     skills_used: list[str] = []
-
-# class Resume(BaseModel):
-#     name: str | None = None
-#     email: str | None = None
-#     phone: str | None = None
-
-#     total_experience_years: float | None = None
-
-#     skills: list[str] = []
-#     experiences: list[Experience] = []
-#     education: list[str] = []
-#     projects: list[str] = []
-#     certifications: list[str] = []
-# resume_schema = Resume.model_json_schema()
-
-# class ChatRequest(BaseModel):
-#     question: str
-
-# def ask_candidate(question: str, resume: Resume):
-
- 
-#     system_prompt = f"""
-# You are TalentQuery, a professional AI candidate screening
-# assistant helping HR recruiters understand a candidate's
-# qualifications.
-
-# CANDIDATE RESUME DATA:
-# {resume.model_dump_json(indent=2)}
-
-# INSTRUCTIONS:
-
-# 1. Answer questions using ONLY the candidate's resume data.
-
-# 2. Never invent skills, experience, qualifications,
-#    certifications, or projects.
-
-# 3. If the resume clearly confirms a skill or experience:
-#    - Answer positively.
-#    - Briefly explain the supporting information.
-
-# 4. If the resume does NOT mention a skill or technology:
-#    - Explain naturally that it is not mentioned in
-#      the candidate's resume.
-#    - Do NOT claim that the candidate has no experience.
-#    - Suggest confirming it during an interview when relevant.
-
-# 5. If the resume explicitly confirms that the candidate
-#    lacks a qualification:
-#    - State that accurately and professionally.
-
-# 6. If the question asks about something unrelated to
-#    the resume:
-#    - Explain politely that you can help with the
-#      candidate's qualifications and experience.
-
-# 7. Keep responses concise, natural, and professional.
-
-# 8. Avoid repeating generic responses such as:
-#    "I don't have enough information to answer that."
-
-# 9. Do not make hiring or rejection decisions.
-
-# 10. Speak as an HR screening assistant, not as the
-#     candidate.
-
-# EXAMPLE:
-
-# HR: Does this candidate have Docker experience?
-
-# AI: Docker experience is not mentioned in the candidate's
-# resume, so I cannot confirm whether they have worked with
-# it. This could be clarified during an interview.
-
-# HR: Does this candidate have React experience?
-
-# AI: Yes, React is listed among the candidate's technical
-# skills. The resume also describes relevant experience
-# where available.
-# """
-
-
-#     response = client.chat.completions.create(
-
-#         model=model,
-
-#         messages=[
-
-#             {
-#                 "role":"system",
-#                 "content":system_prompt
-#             },
-
-#             {
-#                 "role":"user",
-#                 "content":question
-#             }
-
-#         ]
-
-#     )
-
-#     return response.choices[0].message.content
-# def parse_resume(resume_text):
-#     system_prompt = f"""
-#     You are an expert resume parser.
-
-#     Extract information from the resume based on its meaning,
-#     not only based on exact section headings.
-
-#     Different resumes may use different headings.
-
-#     For example:
-#     - Experience
-#     - Professional Experience
-#     - Work History
-#     - Employment
-#     - Internships
-
-#     These may all contain relevant experience.
-
-#     Skills may also appear in the skills section, work experience,
-#     internships or projects.
-
-#     Return ONLY valid JSON matching this schema:
-
-#     {resume_schema}
-
-#     Important rules:
-
-#     1. Do not invent information.
-#     2. If a value is not available, return null.
-#     3. If a list has no information, return an empty list.
-#     4. Include internships inside experiences.
-#     5. Extract skills mentioned across the entire resume.
-#     """
-#     user_prompt = f"""
-#     Parse the following resume:
-
-#     {resume_text}
-#     """
-#     message_system={
-#         "role" : "system",
-#         "content" : system_prompt
-#     }
-#     message_user={
-#         "role" : "user",
-#         "content" : user_prompt
-#     }
-#     messages=[message_system, message_user]
-#     response_format={
-#         "type": "json_object"
-#     }
-#     response=client.chat.completions.create(model=model, messages=messages, response_format=response_format)
-#     raw_output = response.choices[0].message.content
-#     data = json.loads(raw_output)
-#     resume = Resume(**data)
-#     return resume
-
-
-# BASE_DIR = Path(__file__).resolve().parent
-
-# PDF_PATH = BASE_DIR / "my_resume.pdf"
-# JSON_PATH = BASE_DIR / "parsed_resume.json"
-
-
-# def save_resume(resume: Resume):
-#     JSON_PATH.write_text(
-#         resume.model_dump_json(indent=2),
-#         encoding="utf-8"
-#     )
-
-
-# def load_resume() -> Resume | None:
-#     if not JSON_PATH.exists():
-#         return None
-
-#     return Resume.model_validate_json(
-#         JSON_PATH.read_text(encoding="utf-8")
-#     )
-
-
-# def get_resume() -> Resume:
-#     cached_resume = load_resume()
-
-#     if cached_resume is not None:
-#         print("✅ Resume loaded from JSON cache")
-
-#         return cached_resume
-#         print("⏳ Parsing resume using Groq...")
-
-
-#     resume_text = read_pdf(PDF_PATH)
-#     resume = parse_resume(resume_text)
-
-#     save_resume(resume)
-
-#     return resume
-
-# #pdf extraction
-# def read_pdf(file_path: Path):
-
-#     reader = PdfReader(file_path)
-
-#     text = ""
-
-#     for page in reader.pages:
-
-#         page_text = page.extract_text()
-
-#         if page_text:
-#             text += page_text + "\n"
-
-#     return text
-
-
-# @app.get("/")
-# def home():
-#     resume = get_resume()
-
-#     return {
-#         "message": "TalentQuery API is running",
-#         "resume": resume
-#     }
-
-
-# @app.post("/chat")
-# def chat(request: ChatRequest):
-#     resume = get_resume()
-
-#     answer = ask_candidate(request.question, resume)
-
-#     return {"answer": answer}
-
-
-
-# @app.post("/resume/refresh")
-# def refresh_resume():
-#     resume_text = read_pdf(PDF_PATH)
-
-#     resume = parse_resume(resume_text)
-
-#     save_resume(resume)
-
-#     return {
-#         "message": "Resume updated successfully",
-#         "resume": resume
-#     }
-
-
-
-
+import base64
 import json
 import os
 from pathlib import Path
@@ -339,13 +51,20 @@ app = FastAPI(
     version="1.0.0",
 )
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
+
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
@@ -490,13 +209,22 @@ def save_resume(resume: Resume):
 
 
 def load_resume() -> Resume | None:
+    encoded_resume = os.getenv("RESUME_JSON_BASE64")
+
+    if encoded_resume:
+        decoded_resume = base64.b64decode(
+            encoded_resume,
+            validate=True,
+        ).decode("utf-8")
+
+        return Resume.model_validate_json(decoded_resume)
+
     if not JSON_PATH.exists():
         return None
 
     return Resume.model_validate_json(
         JSON_PATH.read_text(encoding="utf-8")
     )
-
 
 def get_resume() -> Resume:
     cached_resume = load_resume()
@@ -731,6 +459,11 @@ def chat_stream(request: ChatRequest):
 
 @app.post("/resume/refresh")
 def refresh_resume():
+    if os.getenv("ENVIRONMENT") == "production":
+      raise HTTPException(
+        status_code=403,
+        detail="Resume refresh is disabled in production.",
+    )
     if not PDF_PATH.exists():
         raise HTTPException(
             status_code=404,
