@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Temporary deployment files
+talentquery-deploy/
+talentquery-deploy.zip

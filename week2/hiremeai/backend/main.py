@@ -5,9 +5,12 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from groq import Groq
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
@@ -49,6 +52,19 @@ app = FastAPI(
     title="TalentQuery API",
     description="AI-powered candidate screening assistant",
     version="1.0.0",
+)
+
+limiter = Limiter(key_func=get_remote_address,  application_limits=["100/hour"],)
+app.state.limiter = limiter
+global_chat_limit = limiter.shared_limit(
+    "30/minute",
+    scope="global-chat",
+    key_func=lambda: "all-users",
+)
+
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler,
 )
 
 allowed_origins = [
@@ -97,7 +113,7 @@ class Resume(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(min_length=1)
+    question: str = Field(min_length=1,max_length=1000,)
 
 
 resume_schema = Resume.model_json_schema()
@@ -417,7 +433,8 @@ def stream_candidate_answer(
 # ==========================================
 
 @app.get("/")
-def home():
+@limiter.limit("30/minute")
+def home(request: Request):
     resume = get_resume()
 
     return {
@@ -427,11 +444,13 @@ def home():
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+@global_chat_limit
+@limiter.shared_limit("5/minute", scope="candidate-chat")
+def chat(request: Request, body: ChatRequest):
     resume = get_resume()
 
     answer = ask_candidate(
-        request.question,
+        body.question,
         resume,
     )
 
@@ -441,12 +460,14 @@ def chat(request: ChatRequest):
 
 
 @app.post("/chat/stream")
-def chat_stream(request: ChatRequest):
+@global_chat_limit
+@limiter.shared_limit("5/minute", scope="candidate-chat")
+def chat_stream(request: Request, body: ChatRequest):
     resume = get_resume()
 
     return StreamingResponse(
         stream_candidate_answer(
-            request.question,
+            body.question,
             resume,
         ),
         media_type="text/plain; charset=utf-8",
